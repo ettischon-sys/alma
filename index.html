@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>כרטיס גירוד - עלמה</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .card-container {
+            position: relative;
+            width: 340px;
+            height: 480px;
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.2);
+            padding: 24px;
+            text-align: center;
+            user-select: none;
+            z-index: 10;
+        }
+
+        .scratch-area {
+            position: relative;
+            width: 280px;
+            height: 280px;
+            margin: 20px auto;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #f3f4f6;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* The hidden content */
+        .prize-text {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            color: #1a1a2e;
+            padding: 20px;
+            z-index: 1;
+        }
+
+        .main-msg {
+            font-size: 24px;
+            font-weight: 800;
+            color: #e94560;
+            line-height: 1.2;
+        }
+
+        .sub-msg {
+            font-size: 20px;
+            margin-top: 10px;
+            color: #16213e;
+        }
+
+        /* The scratchable canvas */
+        #scratchCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 2;
+            cursor: pointer;
+            touch-action: none;
+        }
+
+        .button-reset {
+            margin-top: 20px;
+            padding: 10px 25px;
+            background: #e94560;
+            color: white;
+            border-radius: 12px;
+            font-weight: 700;
+            transition: transform 0.2s, opacity 0.3s;
+            opacity: 0;
+            pointer-events: none;
+            border: none;
+        }
+
+        .button-reset.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .instruction {
+            color: #4b5563;
+            font-size: 15px;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card-container">
+    <h1 class="text-2xl font-bold text-gray-800">כרטיס גירוד</h1>
+    <p class="instruction">עלמה, משהו מחכה לך כאן...</p>
+    
+    <div class="scratch-area" id="scratchArea">
+        <div class="prize-text">
+            <div style="font-size: 50px; margin-bottom: 10px;">🎂✨</div>
+            <div class="main-msg">עלמה!</div>
+            <div class="sub-msg">עוד 11 ימים יש לך יומולדת 13!</div>
+        </div>
+        <canvas id="scratchCanvas"></canvas>
+    </div>
+
+    <button id="resetBtn" class="button-reset" onclick="location.reload()">נסה שוב</button>
+</div>
+
+<script>
+    const canvas = document.getElementById('scratchCanvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const scratchArea = document.getElementById('scratchArea');
+    const resetBtn = document.getElementById('resetBtn');
+    
+    let isDrawing = false;
+    // Threshold set to 75% for a long scratching duration
+    const threshold = 75; 
+
+    function initCanvas() {
+        const rect = scratchArea.getBoundingClientRect();
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+
+        // Silver scratch layer
+        ctx.fillStyle = '#bdc3c7';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Pattern overlay
+        ctx.strokeStyle = '#95a5a6';
+        ctx.lineWidth = 1;
+        for(let i=0; i<canvas.width; i+=10) {
+            ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+        }
+
+        ctx.fillStyle = '#2c3e50';
+        ctx.font = 'bold 24px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('גרדי כאן ✨', canvas.width/2, canvas.height/2 + 10);
+    }
+
+    function scratch(e) {
+        if (!isDrawing) return;
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+        const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.beginPath();
+        // Smaller brush radius (18) for more scratching time
+        ctx.arc(x, y, 18, 0, Math.PI * 2);
+        ctx.fill();
+        checkProgress();
+    }
+
+    function checkProgress() {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const pixels = imageData.data;
+        let clear = 0;
+        for (let i = 3; i < pixels.length; i += 4) {
+            if (pixels[i] === 0) clear++;
+        }
+        if ((clear / (pixels.length / 4)) * 100 > threshold) {
+            reveal();
+        }
+    }
+
+    function reveal() {
+        canvas.style.transition = 'opacity 1s';
+        canvas.style.opacity = '0';
+        canvas.style.pointerEvents = 'none';
+        resetBtn.classList.add('visible');
+    }
+
+    canvas.addEventListener('mousedown', () => isDrawing = true);
+    canvas.addEventListener('touchstart', (e) => { isDrawing = true; e.preventDefault(); });
+    window.addEventListener('mouseup', () => isDrawing = false);
+    window.addEventListener('touchend', () => isDrawing = false);
+    canvas.addEventListener('mousemove', scratch);
+    canvas.addEventListener('touchmove', scratch);
+
+    window.onload = initCanvas;
+</script>
+</body>
+</html>
